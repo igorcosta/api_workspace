@@ -37,7 +37,8 @@ jobs:
 
           g = Github(os.environ['GITHUB_TOKEN'])
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
-          issue = repo.get_issue(number=int(os.environ['GITHUB_REF_NAME']))
+          issue_number = int(os.environ['GITHUB_EVENT_ISSUE_NUMBER'])
+          issue = repo.get_issue(number=issue_number)
 
           client = Groq(api_key=os.environ['GROQ_API_KEY'])
 
