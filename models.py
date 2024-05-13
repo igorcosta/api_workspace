@@ -39,3 +39,11 @@ class Workspace(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     users = relationship("User", secondary=user_workspace_association, back_populates="workspaces")
+
+class Work(Base):
+    __tablename__ = 'works'
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    description = Column(String)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship("User", backref="works")
