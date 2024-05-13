@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 from typing import List
-from models import User, Task, Profile, Workspace
-from schemas import UserCreate, TaskCreate, ProfileCreate, WorkspaceCreate
+from models import User, Task, Profile, Workspace, Work
+from schemas import UserCreate, TaskCreate, ProfileCreate, WorkspaceCreate, WorkCreate, WorkUpdate
 from database import get_db
 from sqlalchemy.orm import Session
 from fastapi.params import Depends
@@ -40,4 +40,37 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
-# Similar CRUD operations for Task, Profile, Workspace entities follow...
+# Work endpoints
+@router.post("/works", response_model=WorkCreate, status_code=status.HTTP_201_CREATED)
+def create_work(work: WorkCreate, db: Session = Depends(get_db)):
+    db_work = Work(**work.dict())
+    db.add(db_work)
+    db.commit()
+    db.refresh(db_work)
+    return db_work
+
+@router.get("/works/{work_id}", response_model=WorkCreate)
+def get_work(work_id: int, db: Session = Depends(get_db)):
+    db_work = db.query(Work).filter(Work.id == work_id).first()
+    if db_work is None:
+        raise HTTPException(status_code=404, detail="Work not found")
+    return db_work
+
+@router.put("/works/{work_id}", response_model=WorkUpdate)
+def update_work(work_id: int, work: WorkUpdate, db: Session = Depends(get_db)):
+    db_work = db.query(Work).filter(Work.id == work_id).first()
+    if db_work is None:
+        raise HTTPException(status_code=404, detail="Work not found")
+    for var, value in vars(work).items():
+        setattr(db_work, var, value) if value else None
+    db.commit()
+    return db_work
+
+@router.delete("/works/{work_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_work(work_id: int, db: Session = Depends(get_db)):
+    db_work = db.query(Work).filter(Work.id == work_id).first()
+    if db_work is None:
+        raise HTTPException(status_code=404, detail="Work not found")
+    db.delete(db_work)
+    db.commit()
+    return {"ok": True}
