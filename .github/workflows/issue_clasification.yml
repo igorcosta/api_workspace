@@ -4,106 +4,66 @@ on:
   issues:
     types: [opened, edited]
 
-permissions:
-  issues: write
-
 jobs:
   classify-issue:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      - name: Install dependencies
-        run: |
-          pip install nltk scikit-learn numpy PyGithub gensim
-      - name: Cache word embeddings
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/word-embeddings
-          key: ${{ runner.os }}-word-embeddings-${{ hashFiles('path/to/word/embeddings') }}
-          restore-keys: |
-            ${{ runner.os }}-word-embeddings-
-      - name: Classify issue
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          import os
-          import nltk
-          import numpy as np
-          from sklearn.metrics.pairwise import cosine_similarity
-          from gensim.models import KeyedVectors
-          from github import Github
-
-          nltk.download('punkt')
-
-          # Get the issue title and body
-          g = Github(os.environ['GITHUB_TOKEN'])
-          repo = g.get_repo('${{ github.repository }}')
-          issue = repo.get_issue(number=${{ github.event.issue.number }})
-          issue_title = issue.title
-          issue_body = issue.body
-
-          # Preprocess the text
-          text = issue_title + ' ' + issue_body
-          text = text.lower()
-          tokens = nltk.word_tokenize(text)
-
-          # Load pre-trained word embeddings (e.g., Word2Vec, GloVe)
-          word_vectors = KeyedVectors.load_word2vec_format('path/to/word/embeddings', binary=True)
-
-          # Define example issues for each label
-          label_examples = {
-            'bug': [
-              'Application crashes on startup',
-              'Unable to save file due to error',
-              'Button not responding to clicks'
-            ],
-            'feature request': [
-              'Add support for exporting data in CSV format',
-              'Implement dark mode theme',
-              'Allow customization of user profile'
-            ],
-            'question': [
-              'How to install the application on Windows?',
-              'What are the system requirements for running the software?',
-              'Is there a user guide available?'
-            ],
-            'documentation': [
-              'Update installation instructions in README',
-              'Add code examples to API documentation',
-              'Fix broken links in user manual'
-            ]
-          }
-
-          # Calculate the average word vector for the issue text
-          issue_vector = np.mean([word_vectors[token] for token in tokens if token in word_vectors.vocab], axis=0)
-
-          # Calculate the cosine similarity between the issue vector and each example issue vector
-          label_similarities = {}
-          for label, examples in label_examples.items():
-            example_vectors = []
-            for example in examples:
-              example_tokens = nltk.word_tokenize(example.lower())
-              example_vector = np.mean([word_vectors[token] for token in example_tokens if token in word_vectors.vocab], axis=0)
-              example_vectors.append(example_vector)
-            if example_vectors:
-              similarity = np.max(cosine_similarity([issue_vector], example_vectors))
-              label_similarities[label] = similarity
-
-          # Predict the label with the highest similarity score
-          predicted_label = max(label_similarities, key=label_similarities.get)
-
-          # Add the label to the issue
-          issue.add_to_labels(predicted_label)
-          issue.create_comment(f'Automatically classified as: {predicted_label}')
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        pip install ollama langchain_community
+        
+    - name: Pull Ollama Docker image
+      run: docker pull ollama/ollama
+        
+    - name: Run Ollama container
+      run: |
+        docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+        
+    - name: Run issue classification
+      env:
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+        ISSUE_BODY: ${{ github.event.issue.body }}
+      run: |
+        from langchain_community.llms import Ollama
+        
+        issue_title = "$ISSUE_TITLE"
+        issue_body = """$ISSUE_BODY"""
+        
+        llm = Ollama(model="llama3:8b")
+        
+        prompt = f"""
+        Classify the following GitHub issue and suggest appropriate labels:
+        
+        Title: {issue_title}
+        
+        Description: 
+        {issue_body}
+        
+        Labels:
+        """
+        
+        labels = llm.invoke(prompt).strip()
+        print(f"Suggested labels: {labels}")
+        
+        # Add labels to issue
+        issue_number = ${{ github.event.issue.number }}
+        labels_array = labels.split(", ")
+        
+        import requests
+        url = f"https://api.github.com/repos/${{ github.repository }}/issues/{issue_number}/labels"
+        headers = {
+          "Authorization": "Bearer ${{ secrets.GITHUB_TOKEN }}"
+        }
+        data = {"labels": labels_array} 
+        response = requests.post(url, headers=headers, json=data)
+        
+        print(response.text)
