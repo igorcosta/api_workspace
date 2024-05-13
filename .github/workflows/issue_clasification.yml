@@ -43,12 +43,17 @@ jobs:
     - name: Run Ollama container
       run: |
         docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-        
+    
     - name: Wait for Ollama container to be ready
       run: |
-        while ! docker exec ollama curl -s -X POST http://localhost:11434/api/generate -d '{"model":"llama3","prompt":"Why is the sky blue?"}' > /dev/null; do
-          sleep 1
-        done
+        while ! docker logs ollama 2>&1 | grep -q "Ollama API server started"; do
+          sleep 30
+        done    
+    # - name: Wait for Ollama container to be ready
+    #   run: |
+    #     while ! docker exec ollama curl -s -X POST http://localhost:11434/api/generate -d '{"model":"llama3","prompt":"Why is the sky blue?"}' > /dev/null; do
+    #       sleep 1
+    #     done
         
     - name: Download Llama 3 8B model
       run: |
