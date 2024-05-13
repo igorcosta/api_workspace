@@ -2,7 +2,7 @@ name: Issue Classification
 
 on:
   issues:
-    types: [opened,edited]
+    types: [opened]
 
 jobs:
   classify-issue:
@@ -15,7 +15,23 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.9'
+        
+    - name: Cache Docker image
+      uses: actions/cache@v3
+      with:
+        path: /var/lib/docker/overlay2
+        key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
+        restore-keys: |
+          ${{ runner.os }}-docker-
+          
+    - name: Cache Ollama model
+      uses: actions/cache@v3
+      with:
+        path: ~/.ollama/models
+        key: ${{ runner.os }}-ollama-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-ollama-
         
     - name: Install dependencies
       run: |
@@ -27,14 +43,16 @@ jobs:
     - name: Run Ollama container
       run: |
         docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-    
+        
+    - name: Wait for Ollama container to be ready
+      run: |
+        while ! docker exec ollama curl -s http://localhost:11434/healthz > /dev/null; do
+          sleep 1
+        done
+        
     - name: Download Llama 3 8B model
       run: |
         docker exec ollama ollama pull llama3:8b
-        
-    - name: Run Llama 3 8B model
-      run: |
-        docker exec ollama ollama run llama3:8b
         
     - name: Run issue classification
       env:
