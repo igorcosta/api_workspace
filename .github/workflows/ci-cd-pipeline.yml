@@ -27,7 +27,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEFAULT_BRANCH: main
-          FILTER_REGEX_EXCLUDE: docs/tool/.*
+          FILTER_REGEX_EXCLUDE: .github/ISSUE_TEMPLATE/.*|README.md
           VALIDATE_MARKDOWN: true
           VALIDATE_YAML: true
           FAIL_ON_ERROR: true
