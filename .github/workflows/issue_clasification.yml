@@ -38,12 +38,19 @@ jobs:
         run: |
           import os
           from github import Github
+          from github.GithubException import UnknownObjectException
           from groq import Groq, APIConnectionError, APIStatusError
 
           g = Github(os.environ['GITHUB_TOKEN'])
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
           issue_number = int(os.environ['ISSUE_NUMBER'])
           issue = repo.get_issue(number=issue_number)
+
+          def ensure_label_exists(repo, label_name):
+              try:
+                  return repo.get_label(label_name)
+              except UnknownObjectException:
+                  return repo.create_label(name=label_name, color='000000')
 
           client = Groq(api_key=os.environ['GROQ_API_KEY'])
 
@@ -70,7 +77,8 @@ jobs:
                       labels.append(content)
 
               labels = list(set(labels))  # Remove duplicates
-              issue.add_to_labels(*[repo.get_label(label) for label in labels])
+              ensured_labels = [ensure_label_exists(repo, label) for label in labels]
+              issue.add_to_labels(*ensured_labels)
               issue.create_comment(f"Issue classified with labels: {', '.join(labels)}")
           except APIConnectionError as e:
               print("Failed to connect to Groq API:", e)
@@ -80,4 +88,3 @@ jobs:
       - name: Job output
         run: | 
           echo "Issue classification completed."
-
