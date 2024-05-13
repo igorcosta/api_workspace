@@ -16,7 +16,7 @@ jobs:
     name: Super Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Lint Code Base
         uses: github/super-linter@v3
         with:
@@ -30,7 +30,7 @@ jobs:
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -49,7 +49,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Build and publish Python package
         run: |
           python setup.py sdist bdist_wheel
@@ -64,7 +64,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Create and publish Docker image for production
         run: |
           docker build -t myapp:${{ github.ref_name }}-production .
@@ -79,12 +79,19 @@ jobs:
           body: "Release of version ${{ github.ref_name }}"
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  final-verification:
-    name: Final Verification
-    needs: [super-lint, development, staging, production]
+  auto-tag-and-release:
+    name: Auto Tag and Release
+    needs: production
     runs-on: ubuntu-latest
     steps:
-      - name: Check completion
-        run: echo "All stages completed successfully"
-
-
+      - name: Generate tag and release
+        id: auto_tag_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            ## Build Report
+            - Release notes for ${{ github.ref_name }}
