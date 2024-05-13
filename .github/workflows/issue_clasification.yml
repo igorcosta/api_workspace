@@ -38,7 +38,7 @@ jobs:
         run: |
           import os
           from github import Github
-          from groq import Groq
+          from groq import Groq, APIConnectionError, APIStatusError
 
           g = Github(os.environ['GITHUB_TOKEN'])
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
@@ -47,32 +47,37 @@ jobs:
 
           client = Groq(api_key=os.environ['GROQ_API_KEY'])
 
-          issue_content = issue.title + "\n\n" + issue.body
+          try:
+              issue_content = issue.title + "\n\n" + issue.body
+              chat_completion = client.chat.completions.create(
+                  messages=[
+                      {
+                          "role": "system",
+                          "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a whole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup",
+                      },
+                      {
+                          "role": "user",
+                          "content": issue_content,
+                      }
+                  ],
+                  model="mixtral-8x7b-32768",
+              )
+              print("API Response:", chat_completion)
+              labels = []
+              for chunk in chat_completion.choices:
+                  content = chunk.message.content.strip()
+                  if content and len(labels) < 5:
+                      labels.append(content)
 
-          chat_completion = client.chat.completions.create(
-              messages=[
-                  {
-                      "role": "system",
-                      "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a whole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup",
-                  },
-                  {
-                      "role": "user", 
-                      "content": issue_content,
-                  }
-              ],
-              model="llama3-8b-8192",
-          )
-
-          labels = []
-          for chunk in chat_completion:
-              content = chunk.choices[0].message.content.strip()
-              if content and len(labels) < 5:
-                  labels.append(content)
-
-          labels = list(set(labels))  # Remove duplicates
-          issue.add_to_labels(*[repo.get_label(label) for label in labels])
-          issue.create_comment(f"Issue classified with labels: {', '.join(labels)}")
+              labels = list(set(labels))  # Remove duplicates
+              issue.add_to_labels(*[repo.get_label(label) for label in labels])
+              issue.create_comment(f"Issue classified with labels: {', '.join(labels)}")
+          except APIConnectionError as e:
+              print("Failed to connect to Groq API:", e)
+          except APIStatusError as e:
+              print(f"API Error {e.status_code}: {e.response}")
         shell: python
       - name: Job output
         run: | 
           echo "Issue classification completed."
+
