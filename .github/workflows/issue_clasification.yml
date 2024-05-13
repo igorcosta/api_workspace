@@ -2,7 +2,7 @@ name: Issue Classification
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened,edited]
 
 jobs:
   classify-issue:
@@ -15,11 +15,11 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.11'
         
     - name: Install dependencies
       run: |
-        pip install ollama langchain_community
+        pip install ollama langchain_community requests
         
     - name: Pull Ollama Docker image
       run: docker pull ollama/ollama
@@ -30,13 +30,17 @@ jobs:
         
     - name: Run issue classification
       env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         ISSUE_TITLE: ${{ github.event.issue.title }}
         ISSUE_BODY: ${{ github.event.issue.body }}
       run: |
+        python << EOF
+        import os
         from langchain_community.llms import Ollama
+        import requests
         
-        issue_title = "$ISSUE_TITLE"
-        issue_body = """$ISSUE_BODY"""
+        issue_title = os.environ["ISSUE_TITLE"]
+        issue_body = os.environ["ISSUE_BODY"]
         
         llm = Ollama(model="llama3:8b")
         
@@ -58,7 +62,6 @@ jobs:
         issue_number = ${{ github.event.issue.number }}
         labels_array = labels.split(", ")
         
-        import requests
         url = f"https://api.github.com/repos/${{ github.repository }}/issues/{issue_number}/labels"
         headers = {
           "Authorization": "Bearer ${{ secrets.GITHUB_TOKEN }}"
@@ -67,3 +70,4 @@ jobs:
         response = requests.post(url, headers=headers, json=data)
         
         print(response.text)
+        EOF
