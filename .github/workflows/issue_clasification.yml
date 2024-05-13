@@ -26,7 +26,7 @@ jobs:
         
     - name: Run Ollama container
       run: |
-        docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+        docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
         
     - name: Run issue classification
       env:
