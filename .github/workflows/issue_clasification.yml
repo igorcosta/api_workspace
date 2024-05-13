@@ -27,6 +27,14 @@ jobs:
     - name: Run Ollama container
       run: |
         docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+    
+    - name: Download Llama 3 8B model
+      run: |
+        docker exec -it ollama ollama pull llama3:8b
+        
+    - name: Run Llama 3 8B model
+      run: |
+        docker exec -it ollama ollama run llama3:8b
         
     - name: Run issue classification
       env:
