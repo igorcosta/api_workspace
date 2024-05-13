@@ -5,7 +5,7 @@ on:
     branches:
       - dev
     tags:
-    - '**'
+      - '**'
   pull_request:
     branches:
       - main
@@ -86,4 +86,5 @@ jobs:
     steps:
       - name: Check completion
         run: echo "All stages completed successfully"
+
 
