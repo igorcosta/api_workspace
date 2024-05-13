@@ -26,10 +26,15 @@ jobs:
         run: |
           pip install groq PyGithub
 
+      - name: Extract issue number
+        id: issue-number
+        run: echo "ISSUE_NUMBER=$(echo ${{ github.event.issue.number }})" >> $GITHUB_ENV
+
       - name: Classify issue using Groq
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         run: |
           import os
           from github import Github
@@ -37,7 +42,7 @@ jobs:
 
           g = Github(os.environ['GITHUB_TOKEN'])
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
-          issue_number = int(os.environ['GITHUB_EVENT_ISSUE_NUMBER'])
+          issue_number = int(os.environ['ISSUE_NUMBER'])
           issue = repo.get_issue(number=issue_number)
 
           client = Groq(api_key=os.environ['GROQ_API_KEY'])
