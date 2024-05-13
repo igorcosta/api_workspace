@@ -4,59 +4,65 @@ on:
   issues:
     types: [opened, edited]
 
+permissions:
+  issues: write
+  contents: read
+
 jobs:
   classify-issue:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          node-version: '16'
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: Install Groq SDK
-        run: npm install groq-sdk
+      - name: Install dependencies
+        run: |
+          pip install groq PyGithub
 
       - name: Classify issue using Groq
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          const Groq = require('groq-sdk');
-          const groq = new Groq({apiKey: process.env.GROQ_API_KEY});
-          const { context } = require('actions/github');
-          async function main() {
-            const issueContent = context.payload.issue.title + "\n\n" + context.payload.issue.body;
-            const chatCompletion = await groq.chat.completions.create({
-              "messages": [
-                {
-                  "role": "system",
-                  "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a whole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup
-                },
-                {
-                  "role": "user",
-                  "content": issueContent
-                }
+          import os
+          from github import Github
+          from groq import Groq
+
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
+          issue = repo.get_issue(number=int(os.environ['GITHUB_REF_NAME']))
+
+          client = Groq(api_key=os.environ['GROQ_API_KEY'])
+
+          issue_content = issue.title + "\n\n" + issue.body
+
+          chat_completion = client.chat.completions.create(
+              messages=[
+                  {
+                      "role": "system",
+                      "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a whole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup",
+                  },
+                  {
+                      "role": "user", 
+                      "content": issue_content,
+                  }
               ],
-              "model": "llama3-8b-8192",
-              "temperature": 1,
-              "max_tokens": 1024,
-              "top_p": 1,
-              "stream": true,
-              "stop": null
-            });
+              model="llama3-8b-8192",
+          )
 
-            let labels = [];
-            for await (const chunk of chatCompletion) {
-              const content = chunk.choices[0]?.delta?.content || '';
-              if (content && labels.length < 5) {
-                labels.push(content.trim());
-              }
-            }
-            labels = [...new Set(labels)]; // Remove duplicates
+          labels = []
+          for chunk in chat_completion:
+              content = chunk.choices[0].message.content.strip()
+              if content and len(labels) < 5:
+                  labels.append(content)
 
-            // Code to add labels to the issue and post a comment with classification feedback
-          }
-          main();
+          labels = list(set(labels))  # Remove duplicates
+          issue.add_to_labels(*[repo.get_label(label) for label in labels])
+          issue.create_comment(f"Issue classified with labels: {', '.join(labels)}")
