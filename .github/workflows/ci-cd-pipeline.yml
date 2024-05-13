@@ -16,7 +16,8 @@ jobs:
     name: Super Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
       - name: Lint Code Base
         uses: github/super-linter@v3
         with:
@@ -70,7 +71,7 @@ jobs:
           docker build -t myapp:${{ github.ref_name }}-production .
       - name: Generate new tag and release
         id: tag_version
-        uses: ncipollo/release-action
+        uses: ncipollo/release-action@v1
         with:
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
