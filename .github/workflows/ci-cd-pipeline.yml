@@ -30,6 +30,7 @@ jobs:
           FILTER_REGEX_EXCLUDE: docs/tool/.*
           VALIDATE_MARKDOWN: true
           VALIDATE_YAML: true
+          FAIL_ON_ERROR: true
 
   development:
     name: Development Stage
