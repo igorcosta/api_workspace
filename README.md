@@ -7,10 +7,10 @@ API Workspace is a RESTful API demonstration designed to showcase a GitHub Works
 ## Requirements
 
 - Python 3.8 or higher
-- FastAPI
-- Uvicorn
-- SQLAlchemy
-- Pydantic
+- FastAPI 0.75.0
+- Uvicorn 0.18.2
+- SQLAlchemy 1.4.37
+- Pydantic 1.9.1
 
 Please refer to `requirements.txt` for specific version requirements.
 
@@ -36,3 +36,4 @@ To set up the project locally, follow these steps:
    ```
 
 This will start the API server, making it accessible on `http://localhost:8000`. You can now use the API endpoints as defined in the project documentation.
+
