@@ -2,7 +2,7 @@
 
 ## Project Description
 
-API Workspace is a RESTful API demonstration designed to showcase a GitHub Workspace integration. This project aims to provide a simple yet powerful interface for managing workspaces, tasks, and user profiles. Key features include user authentication, task management, and workspace customization.
+API Workspace is a RESTful API demonstration designed to showcase a GitHub Workspace integration. This project aims to provide a simple yet powerful interface for managing workspaces, tasks, user profiles, and work information. Key features include user authentication, task management, workspace customization, and work information management.
 
 ## Requirements
 
@@ -37,3 +37,24 @@ To set up the project locally, follow these steps:
 
 This will start the API server, making it accessible on `http://localhost:8000`. You can now use the API endpoints as defined in the project documentation.
 
+## Work Endpoints
+
+The API supports the following endpoints for managing work information:
+
+- **Create a new work**: `POST /works`
+  - Request: Includes details about the work such as title and description.
+  - Response: Returns the created work information.
+
+- **Retrieve work information**: `GET /works/{work_id}`
+  - Request: Requires the `work_id` parameter.
+  - Response: Returns the details of the specified work.
+
+- **Update work information**: `PUT /works/{work_id}`
+  - Request: Includes updated details for the work.
+  - Response: Returns the updated work information.
+
+- **Delete a work**: `DELETE /works/{work_id}`
+  - Request: Requires the `work_id` parameter.
+  - Response: Confirms the deletion of the specified work.
+
+These endpoints allow for the creation, retrieval, updating, and deletion of work information, providing a comprehensive management system for work-related data.
