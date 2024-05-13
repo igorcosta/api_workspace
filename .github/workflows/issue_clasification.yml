@@ -26,20 +26,18 @@ jobs:
         run: |
           const Groq = require('groq-sdk');
           const groq = new Groq({apiKey: process.env.GROQ_API_KEY});
+          const { context } = require('actions/github');
           async function main() {
+            const issueContent = context.payload.issue.title + "\n\n" + context.payload.issue.body;
             const chatCompletion = await groq.chat.completions.create({
               "messages": [
                 {
                   "role": "system",
-                  "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a hole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup
+                  "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a whole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup
                 },
                 {
                   "role": "user",
-                  "content": "this is a bug on my issue"
-                },
-                {
-                  "role": "assistant",
-                  "content": "🐞️ **BUG-Fix Request**\n\nI've labeled this issue as **BUG-Fix Request** because you mentioned it's a bug."
+                  "content": issueContent
                 }
               ],
               "model": "llama3-8b-8192",
@@ -50,9 +48,15 @@ jobs:
               "stop": null
             });
 
+            let labels = [];
             for await (const chunk of chatCompletion) {
-              process.stdout.write(chunk.choices[0]?.delta?.content || '');
+              const content = chunk.choices[0]?.delta?.content || '';
+              if (content && labels.length < 5) {
+                labels.push(content.trim());
+              }
             }
-          }
+            labels = [...new Set(labels)]; // Remove duplicates
 
+            // Code to add labels to the issue and post a comment with classification feedback
+          }
           main();
