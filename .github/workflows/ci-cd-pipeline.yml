@@ -9,7 +9,9 @@ on:
   pull_request:
     branches:
       - main
-
+permissions:
+  contents: write
+  issues: write
 jobs:
   super-lint:
     name: Super Lint
