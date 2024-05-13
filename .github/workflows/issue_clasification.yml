@@ -70,4 +70,3 @@ jobs:
       - name: Job output
         run: | 
           echo "Issue classification completed."
-          
