@@ -4,6 +4,9 @@ on:
   issues:
     types: [opened, edited]
 
+permissions:
+  issues: write
+
 jobs:
   classify-issue:
     runs-on: ubuntu-latest
@@ -14,9 +17,23 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       - name: Install dependencies
         run: |
-          pip install nltk scikit-learn numpy
+          pip install nltk scikit-learn numpy PyGithub gensim
+      - name: Cache word embeddings
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/word-embeddings
+          key: ${{ runner.os }}-word-embeddings-${{ hashFiles('path/to/word/embeddings') }}
+          restore-keys: |
+            ${{ runner.os }}-word-embeddings-
       - name: Classify issue
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -24,8 +41,8 @@ jobs:
           import os
           import nltk
           import numpy as np
-          from sklearn.feature_extraction.text import CountVectorizer
-          from sklearn.naive_bayes import MultinomialNB
+          from sklearn.metrics.pairwise import cosine_similarity
+          from gensim.models import KeyedVectors
           from github import Github
 
           nltk.download('punkt')
@@ -42,17 +59,50 @@ jobs:
           text = text.lower()
           tokens = nltk.word_tokenize(text)
 
-          # Extract features
-          vectorizer = CountVectorizer()
-          features = vectorizer.fit_transform([' '.join(tokens)])
+          # Load pre-trained word embeddings (e.g., Word2Vec, GloVe)
+          word_vectors = KeyedVectors.load_word2vec_format('path/to/word/embeddings', binary=True)
 
-          # Train the classifier (you can use a pre-trained model or train it on labeled data)
-          labels = ['bug', 'not a bug', 'feature request', 'triage', 'error','run time error','errors','bugs']
-          classifier = MultinomialNB()
-          # classifier.fit(features, labels)  # Train the classifier if you have labeled data
+          # Define example issues for each label
+          label_examples = {
+            'bug': [
+              'Application crashes on startup',
+              'Unable to save file due to error',
+              'Button not responding to clicks'
+            ],
+            'feature request': [
+              'Add support for exporting data in CSV format',
+              'Implement dark mode theme',
+              'Allow customization of user profile'
+            ],
+            'question': [
+              'How to install the application on Windows?',
+              'What are the system requirements for running the software?',
+              'Is there a user guide available?'
+            ],
+            'documentation': [
+              'Update installation instructions in README',
+              'Add code examples to API documentation',
+              'Fix broken links in user manual'
+            ]
+          }
 
-          # Predict the label
-          predicted_label = classifier.predict(features)[0]
+          # Calculate the average word vector for the issue text
+          issue_vector = np.mean([word_vectors[token] for token in tokens if token in word_vectors.vocab], axis=0)
+
+          # Calculate the cosine similarity between the issue vector and each example issue vector
+          label_similarities = {}
+          for label, examples in label_examples.items():
+            example_vectors = []
+            for example in examples:
+              example_tokens = nltk.word_tokenize(example.lower())
+              example_vector = np.mean([word_vectors[token] for token in example_tokens if token in word_vectors.vocab], axis=0)
+              example_vectors.append(example_vector)
+            if example_vectors:
+              similarity = np.max(cosine_similarity([issue_vector], example_vectors))
+              label_similarities[label] = similarity
+
+          # Predict the label with the highest similarity score
+          predicted_label = max(label_similarities, key=label_similarities.get)
 
           # Add the label to the issue
           issue.add_to_labels(predicted_label)
