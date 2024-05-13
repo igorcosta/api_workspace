@@ -1,0 +1,59 @@
+name: Issue Classification
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  classify-issue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          pip install nltk scikit-learn numpy
+      - name: Classify issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          import os
+          import nltk
+          import numpy as np
+          from sklearn.feature_extraction.text import CountVectorizer
+          from sklearn.naive_bayes import MultinomialNB
+          from github import Github
+
+          nltk.download('punkt')
+
+          # Get the issue title and body
+          g = Github(os.environ['GITHUB_TOKEN'])
+          repo = g.get_repo('${{ github.repository }}')
+          issue = repo.get_issue(number=${{ github.event.issue.number }})
+          issue_title = issue.title
+          issue_body = issue.body
+
+          # Preprocess the text
+          text = issue_title + ' ' + issue_body
+          text = text.lower()
+          tokens = nltk.word_tokenize(text)
+
+          # Extract features
+          vectorizer = CountVectorizer()
+          features = vectorizer.fit_transform([' '.join(tokens)])
+
+          # Train the classifier (you can use a pre-trained model or train it on labeled data)
+          labels = ['bug', 'not a bug', 'feature request', 'triage', 'error','run time error','errors','bugs']
+          classifier = MultinomialNB()
+          # classifier.fit(features, labels)  # Train the classifier if you have labeled data
+
+          # Predict the label
+          predicted_label = classifier.predict(features)[0]
+
+          # Add the label to the issue
+          issue.add_to_labels(predicted_label)
+          issue.create_comment(f'Automatically classified as: {predicted_label}')
