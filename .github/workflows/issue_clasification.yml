@@ -66,3 +66,8 @@ jobs:
           labels = list(set(labels))  # Remove duplicates
           issue.add_to_labels(*[repo.get_label(label) for label in labels])
           issue.create_comment(f"Issue classified with labels: {', '.join(labels)}")
+        shell: python
+      - name: Job output
+        run: | 
+          echo "Issue classification completed."
+          
