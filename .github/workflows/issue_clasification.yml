@@ -1,4 +1,4 @@
-name: Issue Classification
+name: Issue Classification with Groq
 
 on:
   issues:
@@ -7,98 +7,52 @@ on:
 jobs:
   classify-issue:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        
-    - name: Cache Docker image
-      uses: actions/cache@v4
-      with:
-        path: /var/lib/docker/overlay2
-        key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
-        restore-keys: |
-          ${{ runner.os }}-docker-
-          
-    - name: Cache Ollama model
-      uses: actions/cache@v4
-      with:
-        path: ~/.ollama/models
-        key: ${{ runner.os }}-ollama-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-ollama-
-        
-    - name: Install dependencies
-      run: |
-        pip install ollama langchain_community requests
-        
-    - name: Pull Ollama Docker image
-      run: docker pull ollama/ollama
-        
-    - name: Run Ollama container
-      run: |
-        docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-    
-    - name: Wait for Ollama container to be ready
-      run: |
-        while ! docker logs ollama 2>&1 | grep -q "Ollama API server started"; do
-          sleep 30
-        done    
-    # - name: Wait for Ollama container to be ready
-    #   run: |
-    #     while ! docker exec ollama curl -s -X POST http://localhost:11434/api/generate -d '{"model":"llama3","prompt":"Why is the sky blue?"}' > /dev/null; do
-    #       sleep 1
-    #     done
-        
-    - name: Download Llama 3 8B model
-      run: |
-        docker exec ollama ollama pull llama3:8b
-        
-    - name: Run issue classification
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        ISSUE_TITLE: ${{ github.event.issue.title }}
-        ISSUE_BODY: ${{ github.event.issue.body }}
-      run: |
-        python << EOF
-        import os
-        from langchain_community.llms import Ollama
-        import requests
-        
-        issue_title = os.environ["ISSUE_TITLE"]
-        issue_body = os.environ["ISSUE_BODY"]
-        
-        llm = Ollama(model="llama3:8b")
-        
-        prompt = f"""
-        Classify the following GitHub issue and suggest appropriate labels:
-        
-        Title: {issue_title}
-        
-        Description: 
-        {issue_body}
-        
-        Labels:
-        """
-        
-        labels = llm.invoke(prompt).strip()
-        print(f"Suggested labels: {labels}")
-        
-        # Add labels to issue
-        issue_number = ${{ github.event.issue.number }}
-        labels_array = labels.split(", ")
-        
-        url = f"https://api.github.com/repos/${{ github.repository }}/issues/{issue_number}/labels"
-        headers = {
-          "Authorization": "Bearer ${{ secrets.GITHUB_TOKEN }}"
-        }
-        data = {"labels": labels_array} 
-        response = requests.post(url, headers=headers, json=data)
-        
-        print(response.text)
-        EOF
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install Groq SDK
+        run: npm install groq-sdk
+
+      - name: Classify issue using Groq
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          const Groq = require('groq-sdk');
+          const groq = new Groq({apiKey: process.env.GROQ_API_KEY});
+          async function main() {
+            const chatCompletion = await groq.chat.completions.create({
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "You're a helpful project manager and your goal is to triage GitHub issues by adding respective labels to the issues as they're updated.\n\nClassify each issue by checking the appropriate title, body and description, comments as a hole and propose of it. Apply maximum 5 labels with 1 word or max 2 words separated by - or _, you can be creative if you will and add some GitHub Sup
+                },
+                {
+                  "role": "user",
+                  "content": "this is a bug on my issue"
+                },
+                {
+                  "role": "assistant",
+                  "content": "🐞️ **BUG-Fix Request**\n\nI've labeled this issue as **BUG-Fix Request** because you mentioned it's a bug."
+                }
+              ],
+              "model": "llama3-8b-8192",
+              "temperature": 1,
+              "max_tokens": 1024,
+              "top_p": 1,
+              "stream": true,
+              "stop": null
+            });
+
+            for await (const chunk of chatCompletion) {
+              process.stdout.write(chunk.choices[0]?.delta?.content || '');
+            }
+          }
+
+          main();
