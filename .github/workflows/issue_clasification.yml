@@ -30,11 +30,11 @@ jobs:
     
     - name: Download Llama 3 8B model
       run: |
-        docker exec -it ollama ollama pull llama3:8b
+        docker exec ollama ollama pull llama3:8b
         
     - name: Run Llama 3 8B model
       run: |
-        docker exec -it ollama ollama run llama3:8b
+        docker exec ollama ollama run llama3:8b
         
     - name: Run issue classification
       env:
