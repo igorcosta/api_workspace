@@ -69,14 +69,14 @@ jobs:
           docker build -t myapp:${{ github.ref_name }}-production .
       - name: Generate new tag and release
         id: tag_version
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action
         with:
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+          body: "Release of version ${{ github.ref_name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   final-verification:
     name: Final Verification
@@ -85,3 +85,4 @@ jobs:
     steps:
       - name: Check completion
         run: echo "All stages completed successfully"
+
