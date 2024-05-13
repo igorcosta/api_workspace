@@ -23,18 +23,28 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
-        run: |
-          pip install groq PyGithub
+        run: pip install groq PyGithub
 
       - name: Extract issue number
-        id: issue-number
-        run: echo "ISSUE_NUMBER=$(echo ${{ github.event.issue.number }})" >> $GITHUB_ENV
+        id: get-issue-number
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issueNumber = context.issue.number;
+            core.setOutput('issue_number', issueNumber);
+
+      - name: Validate issue number
+        run: |
+          if [ -z "${{ steps.get-issue-number.outputs.issue_number }}" ] || [ "${{ steps.get-issue-number.outputs.issue_number }}" -eq "0" ]; then
+            echo "Issue number is invalid."
+            exit 1
+          fi
 
       - name: Classify issue using Groq
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
+          ISSUE_NUMBER: ${{ steps.get-issue-number.outputs.issue_number }}
         run: |
           import os
           from github import Github
@@ -43,8 +53,13 @@ jobs:
 
           g = Github(os.environ['GITHUB_TOKEN'])
           repo = g.get_repo(os.environ['GITHUB_REPOSITORY'])
-          issue_number = int(os.environ['ISSUE_NUMBER'])
-          issue = repo.get_issue(number=issue_number)
+          issue = repo.get_issue(number=int(os.environ['ISSUE_NUMBER']))
+
+          # Gather issue content, including comments
+          issue_content = issue.title + '\n\n' + issue.body
+          comments = issue.get_comments()
+          for comment in comments:
+            issue_content += '\n\n' + comment.body
 
           def ensure_label_exists(repo, label_name):
               try:
@@ -55,7 +70,6 @@ jobs:
           client = Groq(api_key=os.environ['GROQ_API_KEY'])
 
           try:
-              issue_content = issue.title + "\n\n" + issue.body
               chat_completion = client.chat.completions.create(
                   messages=[
                       {
@@ -67,7 +81,7 @@ jobs:
                           "content": issue_content,
                       }
                   ],
-                  model="mixtral-8x7b-32768",
+                  model="llama3-8b-8192",
               )
               print("API Response:", chat_completion)
               labels = []
@@ -85,6 +99,6 @@ jobs:
           except APIStatusError as e:
               print(f"API Error {e.status_code}: {e.response}")
         shell: python
+
       - name: Job output
-        run: | 
-          echo "Issue classification completed."
+        run: echo "Issue classification completed."
