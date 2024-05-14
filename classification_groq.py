@@ -54,20 +54,33 @@ def generate_random_color():
     return ''.join(random.choices('0123456789ABCDEF', k=6))
 
 # Ensure the label exists or create a new one if it doesn't
-def ensure_label_exists(repo, label_name):
+def ensure_label_exists(repo, label_name, color=None):
     label_name = label_name[:50]  # Ensure label name does not exceed 50 characters
+    if not color:
+        color = generate_random_color()
     try:
         return repo.get_label(label_name)
     except GithubException as e:
         if e.status == 404:
             try:
-                return repo.create_label(name=label_name, color=generate_random_color())
+                return repo.create_label(name=label_name, color=color)
             except GithubException as create_error:
                 logging.error(f"Failed to create label '{label_name}': {create_error}")
                 return None
         else:
             logging.error(f"Failed to get label '{label_name}': {e}")
             return None
+
+# Extract JSON part from Groq API response
+def extract_json_from_response(response):
+    try:
+        start_idx = response.index('[')
+        end_idx = response.rindex(']') + 1
+        json_str = response[start_idx:end_idx]
+        return json.loads(json_str)
+    except (ValueError, json.JSONDecodeError) as e:
+        logging.error(f"Error extracting JSON from response: {e}")
+        return None
 
 # Get classification labels and corrected text from Groq API
 def get_classification_labels_and_corrected_text(client, issue_content):
@@ -98,15 +111,16 @@ def get_classification_labels_and_corrected_text(client, issue_content):
         # Log the raw response for debugging purposes
         logging.info(f"Raw API response: {response}")
         
-        response_json = json.loads(response)
-        labels = response_json.get('labels', [])
-        corrected_text = response_json.get('corrected_text', None)
+        response_json = extract_json_from_response(response)
+        if response_json:
+            labels = response_json[0].get('labels', '').split(', ')
+            corrected_text = response_json[0].get('corrected_text', None)
+        else:
+            labels = []
+            corrected_text = None
         return labels, corrected_text
     except (APIConnectionError, APIStatusError) as e:
         logging.error(f"Error with Groq API: {e}")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        logging.error(f"Error parsing JSON response: {e}")
         sys.exit(1)
 
 # Check if a matching comment already exists
@@ -134,10 +148,13 @@ def main():
     labels, corrected_text = get_classification_labels_and_corrected_text(client, issue_content)
 
     if not labels:
-        logging.info("No labels generated from Groq API.")
-        sys.exit(1)
+        logging.info("No labels generated from Groq API. Applying default 'Triage' label.")
+        labels = ['triage']
+        color = generate_random_color()
+    else:
+        color = None
 
-    ensured_labels = [ensure_label_exists(repo, label) for label in labels]
+    ensured_labels = [ensure_label_exists(repo, label, color) for label in labels]
     valid_labels = [label for label in ensured_labels if label]
 
     if valid_labels:
