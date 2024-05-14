@@ -1,4 +1,4 @@
-name: Issue Classification with Groq
+name: Classfiy issue
 
 on:
   issues:
@@ -23,7 +23,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install groq PyGithub
+        run: pip install groq PyGithub python-dotenv
 
       - name: Extract issue number and repo
         id: get-issue-data
