@@ -1,4 +1,4 @@
-name: Classfiy issue
+name: Issue Classification with Groq
 
 on:
   issues:
@@ -48,9 +48,9 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           python classification_groq.py \
-            --issue-number=${{ steps.get-issue-data.outputs.issue_number }} \
-            --repo-name=${{ steps.get-issue-data.outputs.repo }} \
-            --fix-typos-comment=true
+            --issue-number ${{ steps.get-issue-data.outputs.issue_number }} \
+            --repo-name ${{ steps.get-issue-data.outputs.repo }} \
+            --fix-typos-comment true
         shell: bash
 
       - name: Job output
