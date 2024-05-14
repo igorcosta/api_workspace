@@ -94,16 +94,20 @@ def get_classification_labels_and_corrected_text(client, issue_content):
         )
         logging.info("API Response received")
         response = chat_completion.choices[0].message.content.strip()
+        
+        # Log the raw response for debugging purposes
+        logging.info(f"Raw API response: {response}")
+        
         response_json = json.loads(response)
         labels = response_json.get('labels', [])
         corrected_text = response_json.get('corrected_text', None)
         return labels, corrected_text
     except (APIConnectionError, APIStatusError) as e:
         logging.error(f"Error with Groq API: {e}")
-        return [], None
+        sys.exit(1)
     except json.JSONDecodeError as e:
         logging.error(f"Error parsing JSON response: {e}")
-        return [], None
+        sys.exit(1)
 
 # Check if a matching comment already exists
 def comment_exists(issue, comment_content):
@@ -131,7 +135,7 @@ def main():
 
     if not labels:
         logging.info("No labels generated from Groq API.")
-        return
+        sys.exit(1)
 
     ensured_labels = [ensure_label_exists(repo, label) for label in labels]
     valid_labels = [label for label in ensured_labels if label]
@@ -148,6 +152,7 @@ def main():
             add_collapsible_comment(issue, corrected_text['body'])
     else:
         logging.info("No corrected text provided by Groq API.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
