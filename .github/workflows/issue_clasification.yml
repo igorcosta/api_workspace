@@ -14,28 +14,30 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
       - name: Install dependencies
         run: pip install groq PyGithub
 
-      - name: Extract issue number
-        id: get-issue-number
+      - name: Extract issue number and repo
+        id: get-issue-data
         uses: actions/github-script@v6
         with:
           script: |
             const issueNumber = context.issue.number;
+            const repo = context.repo.full_name;
             core.setOutput('issue_number', issueNumber);
+            core.setOutput('repo', repo);
 
       - name: Validate issue number
         run: |
-          if [ -z "${{ steps.get-issue-number.outputs.issue_number }}" ] || [ "${{ steps.get-issue-number.outputs.issue_number }}" -eq "0" ]; then
+          if [ -z "${{ steps.get-issue-data.outputs.issue_number }}" ] || [ "${{ steps.get-issue-data.outputs.issue_number }}" -eq "0" ]; then
             echo "Issue number is invalid."
             exit 1
           fi
@@ -44,8 +46,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          ISSUE_NUMBER: ${{ steps.get-issue-number.outputs.issue_number }}
-        run: python classification_groq.py
+        run: |
+          python classification_groq.py \
+            --issue-number=${{ steps.get-issue-data.outputs.issue_number }} \
+            --repo-name=${{ steps.get-issue-data.outputs.repo }} \
+            --fix-typos-comment=true
         shell: bash
 
       - name: Job output
