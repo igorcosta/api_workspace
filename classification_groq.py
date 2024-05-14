@@ -5,7 +5,6 @@ import json
 import logging
 import random
 import sys
-import urllib.parse
 from github import Github, GithubException
 from groq import Groq, APIConnectionError, APIStatusError
 from dotenv import load_dotenv
@@ -41,14 +40,6 @@ g = Github(github_token)
 repo = g.get_repo(repo_name)
 issue = repo.get_issue(number=issue_number)
 
-# Gather issue content, including comments
-def gather_issue_content(issue):
-    content = issue.title + '\n\n' + issue.body
-    comments = issue.get_comments()
-    for comment in comments:
-        content += '\n\n' + comment.body
-    return content
-
 # Generate a random hex color
 def generate_random_color():
     return ''.join(random.choices('0123456789ABCDEF', k=6))
@@ -74,8 +65,8 @@ def ensure_label_exists(repo, label_name, color=None):
 # Extract JSON part from Groq API response
 def extract_json_from_response(response):
     try:
-        start_idx = response.index('[')
-        end_idx = response.rindex(']') + 1
+        start_idx = response.index('{')
+        end_idx = response.rindex('}') + 1
         json_str = response[start_idx:end_idx]
         return json.loads(json_str)
     except (ValueError, json.JSONDecodeError) as e:
@@ -83,24 +74,30 @@ def extract_json_from_response(response):
         return None
 
 # Get classification labels and corrected text from Groq API
-def get_classification_labels_and_corrected_text(client, issue_content):
+def get_classification_labels_and_corrected_text(client, issue_data):
     try:
         chat_completion = client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You're a helpful project manager. Your goals are:\n"
-                        "1. Triage a GitHub issue by adding appropriate labels based on the issue's title, body, and comments. "
-                        "Apply a maximum of 5 labels with 1 or 2 words separated by hyphens or underscores. You can be creative and "
-                        "use GitHub-supported emojis. Your final response should only include the list of labels you want to apply, separated by commas, and nothing else.\n"
-                        "2. Validate and fix any grammar issues in the issue title and body, removing typos and ensuring it is in valid GitHub-flavored markdown format.\n"
-                        "3. Provide an alternative text for the issue body with corrections and improved formatting. Respond with a JSON object containing 'labels' and 'corrected_text'."
+                        "You are a helpful project manager. Your goals are:\n"
+                        "1. Triage a GitHub issue by adding appropriate labels based on the issue's title and body, including comments. "
+                        "Apply a maximum of 5 labels with 1 or 2 words separated by hyphens or underscores. Your response should include only the list of labels you want to apply, separated by commas.\n"
+                        "2. Act as a document reviewer focusing on fixing any grammar issues and typos in the issue title and body, ensuring they are in valid GitHub-flavored markdown format.\n"
+                        "3. Provide corrected text for the issue body and title with improved formatting. Respond with a JSON object containing 'labels', 'corrected_text', and 'title'.\n"
+                        "4. For the title, you MUST keep the same wording, correcting ONLY typos and grammar issues, if there's a word that you don't have in your knowledge don't rewrite, it must be special and always starts with Upper case, just leave it alone. If there are no corrections, return the original title, but NEVER change the title wording.\n"
+                        "If there are no labels to apply, return an empty object. Here is an example of the expected JSON response:\n"
+                        "{\n"
+                        '  "labels": "label1, label2, label3",\n'
+                        '  "corrected_text": "Here is the corrected issue body.",\n'
+                        '  "title": "Corrected Issue Title"\n'
+                        "}"
                     ),
                 },
                 {
                     "role": "user",
-                    "content": issue_content,
+                    "content": json.dumps(issue_data),
                 }
             ],
             model="llama3-8b-8192",
@@ -113,12 +110,14 @@ def get_classification_labels_and_corrected_text(client, issue_content):
         
         response_json = extract_json_from_response(response)
         if response_json:
-            labels = response_json[0].get('labels', '').split(', ')
-            corrected_text = response_json[0].get('corrected_text', None)
+            labels = response_json.get('labels', '').split(', ') if response_json.get('labels') else []
+            corrected_text = response_json.get('corrected_text', None)
+            title = response_json.get('title', None)
         else:
             labels = []
             corrected_text = None
-        return labels, corrected_text
+            title = None
+        return labels, corrected_text, title
     except (APIConnectionError, APIStatusError) as e:
         logging.error(f"Error with Groq API: {e}")
         sys.exit(1)
@@ -143,9 +142,14 @@ def add_collapsible_comment(issue, corrected_text):
 
 # Main script execution
 def main():
-    issue_content = gather_issue_content(issue)
+    issue_data = {
+        "title": issue.title,
+        "body": issue.body,
+        "comments": [comment.body for comment in issue.get_comments()]
+    }
+
     client = Groq(api_key=groq_api_key)
-    labels, corrected_text = get_classification_labels_and_corrected_text(client, issue_content)
+    labels, corrected_text, title = get_classification_labels_and_corrected_text(client, issue_data)
 
     if not labels:
         logging.info("No labels generated from Groq API. Applying default 'Triage' label.")
@@ -163,12 +167,14 @@ def main():
         if not comment_exists(issue, "Issue classified with labels"):
             issue.create_comment(comment_content)
 
+    if title:
+        issue.edit(title=title)
     if corrected_text:
-        issue.edit(title=corrected_text['title'])
+        issue.edit(body=corrected_text)
         if args.fix_typos_comment:
-            add_collapsible_comment(issue, corrected_text['body'])
+            add_collapsible_comment(issue, corrected_text)
     else:
-        logging.info("No corrected text provided by Groq API.")
+        logging.info("No corrected text or title provided by Groq API.")
         sys.exit(1)
 
 if __name__ == "__main__":
