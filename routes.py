@@ -74,3 +74,21 @@ def delete_work(work_id: int, db: Session = Depends(get_db)):
     db.delete(db_work)
     db.commit()
     return {"ok": True}
+
+# Profile endpoints
+@router.get("/users/{user_id}/profile", response_model=ProfileCreate)
+def get_user_profile(user_id: int, db: Session = Depends(get_db)):
+    db_profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if db_profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return db_profile
+
+@router.put("/users/{user_id}/profile", response_model=ProfileCreate)
+def update_user_profile(user_id: int, profile: ProfileCreate, db: Session = Depends(get_db)):
+    db_profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+    if db_profile is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    for var, value in vars(profile).items():
+        setattr(db_profile, var, value) if value else None
+    db.commit()
+    return db_profile
