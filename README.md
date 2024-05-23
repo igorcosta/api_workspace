@@ -37,6 +37,28 @@ To set up the project locally, follow these steps:
 
 This will start the API server, making it accessible on `http://localhost:8000`. You can now use the API endpoints as defined in the project documentation.
 
+## Docker Deployment
+
+To deploy this API using Docker, follow these steps:
+
+1. Build the Docker image:
+   ```
+   docker build -t api_workspace .
+   ```
+   This command builds a Docker image named `api_workspace` using the `Dockerfile` in the current directory.
+
+2. Run the Docker container:
+   ```
+   docker run -p 80:80 api_workspace
+   ```
+   This command runs the `api_workspace` image as a container, mapping port 80 from the container to port 80 on the host machine.
+
+For production deployment, consider setting environment variables within the Docker container to configure the application appropriately.
+
+For advanced deployment options and troubleshooting, refer to the [Docker documentation](https://docs.docker.com/).
+
+For a comprehensive list of Docker commands, visit the [Docker commands documentation](https://docs.docker.com/engine/reference/commandline/cli/).
+
 ## Work Endpoints
 
 The API supports the following endpoints for managing work information:
