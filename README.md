@@ -80,3 +80,7 @@ The API supports the following endpoints for managing work information:
   - Response: Confirms the deletion of the specified work.
 
 These endpoints allow for the creation, retrieval, updating, and deletion of work information, providing a comprehensive management system for work-related data.
+
+## GitHub Workflow Tutorials
+
+For a detailed guide on setting up and understanding the `.github/workflows/issue_classification.yml` file, please refer to our tutorial: [TUTORIAL_ISSUE_CLASSIFICATION.md](TUTORIAL_ISSUE_CLASSIFICATION.md). This tutorial is designed for level 100 users and provides step-by-step instructions on how to classify issues, apply labels, and customize the workflow for different repository needs.
